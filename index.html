@@ -386,29 +386,39 @@
   function applyRemoteSnapshot(data){
     applyingRemoteUpdate = true;
     localDirty = false;
-    var geocercasFromCloud = [];
     try{
-      geocercasFromCloud = data.geocercasJson ? JSON.parse(data.geocercasJson) : (data.geocercas || []);
-    }catch(e){
-      geocercasFromCloud = [];
-      setStatus('Error leyendo geocercas de la nube: ' + e.message);
+      var geocercasFromCloud = [];
+      try{
+        geocercasFromCloud = data.geocercasJson ? JSON.parse(data.geocercasJson) : (data.geocercas || []);
+      }catch(e){
+        geocercasFromCloud = [];
+        setStatus('Error leyendo geocercas de la nube: ' + e.message);
+      }
+      pendingGeocercas = geocercasFromCloud;
+      if(typeof data.maxAutoId === 'number') geocercaAutoId = Math.max(geocercaAutoId, data.maxAutoId);
+      var nDisabled = pendingGeocercas.filter(function(g){return g.enabled===false;}).length;
+      document.getElementById('enabledRow').style.display = nDisabled ? 'flex' : 'none';
+      document.getElementById('disabledCount').textContent = nDisabled;
+      document.getElementById('editPanel').style.display = pendingGeocercas.length ? 'block' : 'none';
+      btnRun.disabled = !pendingGeocercas.length;
+      renderGeocercaList();
+      var who = data.lastEditedBy ? (' (por ' + data.lastEditedBy + ')') : '';
+      setStatus(pendingGeocercas.length + ' geocerca(s) sincronizadas' + who + '. Pulsa "Calcular cruce" para (re)generar resultados y mapa.');
+    } finally {
+      // pase lo que pase arriba, esta bandera SIEMPRE se libera: si se queda en true por
+      // error, ningún guardado futuro se vuelve a subir a la nube.
+      applyingRemoteUpdate = false;
     }
-    pendingGeocercas = geocercasFromCloud;
-    if(typeof data.maxAutoId === 'number') geocercaAutoId = Math.max(geocercaAutoId, data.maxAutoId);
-    var nDisabled = pendingGeocercas.filter(function(g){return g.enabled===false;}).length;
-    document.getElementById('enabledRow').style.display = nDisabled ? 'flex' : 'none';
-    document.getElementById('disabledCount').textContent = nDisabled;
-    document.getElementById('editPanel').style.display = pendingGeocercas.length ? 'block' : 'none';
-    btnRun.disabled = !pendingGeocercas.length;
-    renderGeocercaList();
-    applyingRemoteUpdate = false;
-    var who = data.lastEditedBy ? (' (por ' + data.lastEditedBy + ')') : '';
-    setStatus(pendingGeocercas.length + ' geocerca(s) sincronizadas' + who + '. Pulsa "Calcular cruce" para (re)generar resultados y mapa.');
   }
 
   function startCloudSync(){
     var docRef = cloudDb.collection('workspaces').doc(cloudWorkspaceId);
     cloudUnsub = docRef.onSnapshot(function(snap){
+      // Firestore avisa dos veces por cada escritura propia: una local optimista
+      // (todavía no confirmada por el servidor) y otra ya confirmada. La primera es
+      // un eco de algo que ya tenemos en memoria (nosotros la escribimos); reaccionar
+      // a ella no aporta nada y puede pisar una edición que hicimos justo después.
+      if(snap.metadata && snap.metadata.hasPendingWrites) return;
       if(!snap.exists) return; // nadie ha subido geocercas todavía en este workspace
       var data = snap.data();
       if(!data || (!data.geocercasJson && !data.geocercas)) return;
@@ -1258,11 +1268,19 @@
     });
   }
 
-  function closeEditModal(){
+  // Cierra solo la UI del modal, sin tocar pendingCloudUpdate. Quien llame a esto
+  // decide si corresponde aplicar o descartar una actualización remota en espera.
+  function closeEditModalUI(){
     document.getElementById('editModalOverlay').classList.remove('open');
     if(editLeafletMap && editLayer){ editLeafletMap.removeLayer(editLayer); }
     editLayer = null;
     editingGeocercaId = null;
+  }
+
+  // Cancelar / cerrar con la X: no hay edición local nueva que proteger, así que si
+  // llegó una actualización de la nube mientras el modal estaba abierto, se aplica.
+  function closeEditModal(){
+    closeEditModalUI();
     if(pendingCloudUpdate){
       var data = pendingCloudUpdate;
       pendingCloudUpdate = null;
@@ -1286,7 +1304,13 @@
     g.name = document.getElementById('editNameInput').value.trim() || g.name;
     g.colorCode = document.getElementById('editColorInput').value;
     g.edited = true;
-    closeEditModal();
+    // Descartamos cualquier actualización remota en espera: es más vieja que la
+    // edición que se acaba de hacer y aplicarla ahora la borraría antes de subirla.
+    // Como de todos modos vamos a subir pendingGeocercas completo, no se pierde nada
+    // real de la nube: en el peor caso, si alguien más editó algo distinto mientras
+    // tanto, se resincroniza solo con el próximo cambio de cualquiera de los dos.
+    pendingCloudUpdate = null;
+    closeEditModalUI();
     renderGeocercaList();
     localDirty = true;
     saveSession();
