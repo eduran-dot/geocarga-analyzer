@@ -27,7 +27,7 @@
 // ============================================================================
 
 window.FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAb7PDo_PdgoPzgRp6hak0163kOqj-dAw4",
+  apiKey: "AIzaSyAb7PDo_PDgoPzgRp6hak0163kOqj-dAw4",
   authDomain: "geocarga-1fb0a.firebaseapp.com",
   projectId: "geocarga-1fb0a",
   storageBucket: "geocarga-1fb0a.firebasestorage.app",
