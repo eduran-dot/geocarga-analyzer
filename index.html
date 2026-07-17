@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="es-MX">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoCarga Analyzer — Movicarga Bajío</title>
+<link rel="stylesheet" href="lib/leaflet/leaflet.css">
+<link rel="stylesheet" href="lib/leaflet-draw/leaflet.draw.css">
+<style>
+  :root{
+    --bg:#0f1720; --panel:#16212c; --panel2:#1c2a37; --border:#2a3a48;
+    --text:#e8edf2; --muted:#93a4b3; --accent:#4a9d3c; --accent2:#59d499;
+    --warn:#f5a623; --danger:#ff6b6b;
+    --brand-green:#5cb32e; --brand-green-dark:#2f7a1e; --brand-navy:#16325c; --brand-gray:#8a8f98;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);}
+  header{padding:16px 28px;border-bottom:2px solid var(--brand-green);display:flex;align-items:center;gap:14px;}
+  header img.brand-logo{height:44px;width:auto;display:block;background:#fff;border-radius:6px;padding:4px 8px;}
+  header .brand-text h1{margin:0 0 4px;font-size:20px;color:#fff;}
+  header .brand-text p{margin:0;color:var(--muted);font-size:13px;}
+  main{padding:24px 28px;max-width:1400px;margin:0 auto;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:18px 20px;margin-bottom:20px;}
+  .panel h2{margin:0 0 12px;font-size:15px;color:var(--text);}
+  .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+  input[type=file]{color:var(--muted);font-size:13px;}
+  button{background:var(--accent);color:#04121f;border:none;border-radius:6px;
+    padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+  button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  button:hover:not(:disabled){filter:brightness(1.08);}
+  .hint{color:var(--muted);font-size:12.5px;line-height:1.5;}
+  .progress-wrap{margin-top:10px;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;display:none;}
+  .progress-bar{height:100%;background:var(--accent);width:0%;transition:width .15s;}
+  .status-line{font-size:12.5px;color:var(--muted);margin-top:8px;min-height:16px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge.completo{background:rgba(89,212,153,.18);color:var(--accent2);}
+  .badge.partido{background:rgba(245,166,35,.18);color:var(--warn);}
+  .badge.partido-entre{background:rgba(255,107,107,.18);color:var(--danger);}
+  .badge.marginal{background:rgba(147,164,179,.18);color:var(--muted);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+  th{cursor:pointer;color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;
+    letter-spacing:.03em;position:sticky;top:0;background:var(--panel);user-select:none;}
+  th:hover{color:var(--text);}
+  tbody tr:hover{background:var(--panel2);}
+  .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  select,input[type=text]{background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:7px 10px;border-radius:6px;font-size:12.5px;}
+  .table-wrap{max-height:520px;overflow:auto;border:1px solid var(--border);border-radius:8px;}
+  .summary-cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+  .card{background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+    padding:12px 18px;min-width:120px;}
+  .card .num{font-size:22px;font-weight:700;}
+  .card .lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+  #mapDiv{width:100%;height:560px;background:#0b1219;border-radius:8px;border:1px solid var(--border);}
+  .map-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .map-toolbar .hint{margin:0;}
+  .legend{display:flex;gap:16px;margin-top:8px;font-size:12px;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  #emptyState{color:var(--muted);font-size:13px;padding:30px;text-align:center;}
+  a.dl-link{color:var(--accent);text-decoration:none;}
+  .footer-note{color:var(--muted);font-size:11.5px;margin-top:30px;line-height:1.6;}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:12px;}
+
+  .geocerca-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;}
+  .geocerca-row{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel2);
+    border:1px solid var(--border);border-radius:8px;}
+  .geocerca-row .swatch2{width:14px;height:14px;border-radius:4px;flex:0 0 auto;border:1px solid rgba(255,255,255,.3);}
+  .geocerca-row .gname{flex:1;font-size:13px;}
+  .geocerca-row .gtag{font-size:10.5px;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:1px 7px;}
+  .geocerca-row .gtag.edited{color:var(--accent2);border-color:var(--accent2);}
+  .geocerca-row .gtag.off{color:var(--muted);}
+  .geocerca-row .gcheck{flex:0 0 auto;width:15px;height:15px;cursor:pointer;}
+  .geocerca-quickpick{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:12px;color:var(--muted);flex-wrap:wrap;}
+  .geocerca-quickpick button{padding:4px 10px;font-size:11.5px;}
+  .geocerca-quickpick .count{font-size:12px;color:var(--text);}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(4,8,12,.72);display:none;
+    align-items:center;justify-content:center;z-index:2000;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal-dialog{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    width:100%;max-width:900px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;border-bottom:1px solid var(--border);}
+  .modal-header h3{margin:0;font-size:15px;}
+  .modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px;}
+  .modal-body{padding:16px 18px;overflow:auto;}
+  .modal-body .row{margin-bottom:12px;}
+  .modal-body label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .modal-body input[type=text]{width:100%;}
+  #editMapDiv{width:100%;height:420px;border-radius:8px;border:1px solid var(--border);background:#0b1219;}
+  .modal-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--border);}
+
+  .auth-badge{display:none;align-items:center;gap:10px;margin-left:auto;font-size:12.5px;color:var(--muted);}
+  .auth-badge.show{display:flex;}
+  .auth-badge .who{color:var(--text);}
+  .auth-badge button{padding:6px 12px;font-size:12px;}
+  .login-body label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em;}
+  .login-body input{width:100%;margin-bottom:12px;padding:9px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13.5px;}
+  .login-error{color:var(--danger);font-size:12.5px;min-height:16px;margin-top:4px;}
+
+  /* Vértices de edición más chicos (por defecto Leaflet.draw los pone de 8x8) */
+  .leaflet-editing-icon{
+    width:8px !important; height:8px !important;
+    margin-left:-4px !important; margin-top:-4px !important;
+  }
+
+  .session-banner{background:rgba(89,212,153,.1);border:1px solid var(--accent2);border-radius:8px;
+    padding:12px 16px;margin-bottom:16px;display:none;align-items:center;gap:14px;flex-wrap:wrap;}
+  .session-banner.show{display:flex;}
+  .session-banner p{margin:0;font-size:13px;color:var(--text);flex:1;min-width:200px;}
+  .autosave-note{font-size:11.5px;color:var(--muted);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<header>
+  <img class="brand-logo" src="assets/movicarga-logo.png" alt="Movicarga" onerror="this.style.display='none'">
+  <div class="brand-text">
+    <h1>GeoCarga Analyzer</h1>
+    <p>Sube el GeoJSON de tus geocercas y obtén qué códigos postales quedan completos, cuáles partidos, en qué geocerca y en qué porcentaje.</p>
+  </div>
+  <div class="auth-badge" id="authBadge">
+    <span class="who" id="authWho"></span>
+    <button id="btnLogout" class="secondary">Cerrar sesión</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="panel">
+    <h2>1. Cargar geocerca(s)</h2>
+    <div class="session-banner" id="sessionBanner">
+      <p id="sessionBannerText"></p>
+      <button id="btnRestoreSession">Continuar sesión guardada</button>
+      <button id="btnDiscardSession" class="secondary">Descartar</button>
+    </div>
+    <div class="row">
+      <input type="file" id="fileInput" accept=".json,.geojson,application/geo+json,application/json" multiple>
+      <button id="btnExample" class="secondary">Cargar ejemplo</button>
+      <button id="btnRun" disabled>Calcular cruce</button>
+    </div>
+    <p class="hint">
+      Acepta un GeoJSON con una o varias geocercas (Polygon / MultiPolygon), como <code>FeatureCollection</code> con varias <code>Features</code>.
+      El nombre de cada geocerca se toma de <code>name</code>/<code>nombre</code> (ya sea al nivel del Feature o dentro de <code>properties</code>).
+      Puedes seleccionar varios archivos a la vez.
+    </p>
+    <div class="row" id="enabledRow" style="display:none;margin-top:4px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);">
+        <input type="checkbox" id="includeDisabled"> Incluir geocercas marcadas como desactivadas (<span id="disabledCount">0</span>)
+      </label>
+    </div>
+    <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="status-line" id="statusLine"></div>
+  </div>
+
+  <div class="panel" id="editPanel" style="display:none;">
+    <h2>2. Editar geocercas</h2>
+    <p class="hint">
+      Selecciona una geocerca y edítala arrastrando sus vértices para que abarque el código postal completo.
+      Los polígonos de CP ya calculados se muestran de fondo como referencia (si aún no calculas el cruce, edita sin esa referencia).
+      Cuando termines, descarga el KML con tus geocercas (con los cambios aplicados) para subirlo a tu plataforma.
+    </p>
+    <div class="row" style="margin-bottom:10px;">
+      <button id="btnDownloadKml" class="secondary">Descargar geocercas como KML</button>
+      <button id="btnSaveProgress" class="secondary">Guardar progreso</button>
+      <button id="btnClearProgress" class="secondary">Borrar guardado</button>
+      <span class="status-line" id="editStatus" style="margin:0;"></span>
+    </div>
+    <div class="geocerca-quickpick">
+      <span>Descargar KML:</span>
+      <button type="button" class="secondary" id="btnPickAll">Todas</button>
+      <button type="button" class="secondary" id="btnPickNone">Ninguna</button>
+      <button type="button" class="secondary" id="btnPickEdited">Solo editadas</button>
+      <span class="count" id="pickCount"></span>
+    </div>
+    <div class="geocerca-list" id="geocercaList"></div>
+    <p class="autosave-note" id="autosaveNote">
+      Tus cambios se guardan automáticamente en este navegador (no hace falta descargar/recargar nada). Al reabrir este HTML aquí mismo, podrás continuar donde te quedaste.
+    </p>
+  </div>
+
+  <div class="panel" id="resultsPanel" style="display:none;">
+    <h2>3. Resultados</h2>
+
+    <div class="summary-cards" id="summaryCards"></div>
+
+    <div class="filters">
+      <input type="text" id="filterCp" placeholder="Buscar CP...">
+      <select id="filterEstado"><option value="">Todos los estados</option></select>
+      <select id="filterGeocerca"><option value="">Todas las geocercas</option></select>
+      <select id="filterClass">
+        <option value="">Todas las clasificaciones</option>
+        <option value="Completo">Completo</option>
+        <option value="Partido entre geocercas">Partido entre geocercas</option>
+        <option value="Partido (zona incompleta)">Partido (zona incompleta)</option>
+        <option value="Marginal">Marginal (&lt;0.5%)</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);">
+        <input type="checkbox" id="onlySplit"> Solo CPs partidos entre geocercas
+      </label>
+      <button id="btnExport" class="secondary">Exportar a Excel</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th data-key="cp">CP</th>
+            <th data-key="estado">Estado</th>
+            <th data-key="geocerca">Geocerca</th>
+            <th data-key="pct">% en esta geocerca</th>
+            <th data-key="clasificacion">Clasificación</th>
+            <th data-key="pctTotalCp">% total cubierto del CP</th>
+            <th data-key="clasificacionTotal">Estatus del CP</th>
+            <th data-key="geocercasInvolucradas">Geocercas involucradas</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+    <div id="emptyState" style="display:none;">No se encontraron códigos postales que crucen con las geocercas cargadas.</div>
+  </div>
+
+  <div class="panel" id="mapPanel" style="display:none;">
+    <div class="map-toolbar">
+      <h2 style="margin:0;">4. Mapa</h2>
+      <p class="hint">Rueda del mouse o pellizco = zoom · arrastrar = mover · clic en un CP = ver info</p>
+    </div>
+    <div class="row" style="margin-bottom:10px;">
+      <input type="text" id="searchCpInput" placeholder="Buscar CP en el mapa..." style="flex:0 0 220px;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:13px;">
+      <button id="btnSearchCp" class="secondary">Ir al CP</button>
+      <span class="status-line" id="searchCpStatus" style="margin:0;"></span>
+    </div>
+    <div id="mapDiv"></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:#59d499"></span> CP completo (&ge;99.5%)</span>
+      <span><span class="swatch" style="background:#ff6b6b"></span> CP partido ENTRE geocercas</span>
+      <span><span class="swatch" style="background:#f5a623"></span> CP partido (zona incompleta)</span>
+      <span><span class="swatch" style="background:#3ea6ff33;border:1px solid #3ea6ff"></span> Geocerca</span>
+    </div>
+    <p class="hint" style="margin-top:6px;">El mapa de fondo (calles/ciudades) se carga desde internet en el momento de verlo. El cálculo de cruce ya se hizo localmente y no depende de esto; si no hay internet, los polígonos se siguen viendo, solo sin el fondo.</p>
+  </div>
+
+  <p class="footer-note">
+    Polígonos de código postal: elaborados a partir de datos abiertos de Correos de México (SEPOMEX),
+    vía el dataset <a class="dl-link" href="https://github.com/open-mexico/mexico-geojson" target="_blank">open-mexico/mexico-geojson</a> (licencia MIT), simplificados para uso en navegador.
+    Las geometrías están simplificadas (tolerancia ≈10&nbsp;m), por lo que los porcentajes son una aproximación de buena precisión,
+    no un dato topográfico exacto. Los cruces menores a 0.5% del área del CP se omiten por ser ruido de simplificación.
+  </p>
+
+  <div class="modal-overlay" id="loginOverlay">
+    <div class="modal-dialog" style="max-width:380px;">
+      <div class="modal-header">
+        <h3>Iniciar sesión — modo colaborativo</h3>
+      </div>
+      <div class="modal-body login-body">
+        <p class="hint" style="margin-top:0;">Usa la cuenta que se creó para ti en Firebase. Las geocercas que veas aquí son compartidas con tu equipo.</p>
+        <label>Correo</label>
+        <input type="email" id="loginEmail" autocomplete="username">
+        <label>Contraseña</label>
+        <input type="password" id="loginPassword" autocomplete="current-password">
+        <div class="login-error" id="loginError"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnLogin">Entrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="editModalOverlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="editModalTitle">Editar geocerca</h3>
+        <button class="modal-close" id="editModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div style="flex:1;min-width:200px;">
+            <label>Nombre</label>
+            <input type="text" id="editNameInput">
+          </div>
+          <div style="flex:0 0 auto;">
+            <label>Color</label>
+            <input type="color" id="editColorInput" value="#3ea6ff" style="height:36px;width:56px;padding:2px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);">
+          </div>
+        </div>
+        <p class="hint">
+          Arrastra los cuadritos blancos para mover un vértice. Arrastra el punto semitransparente a la mitad de una arista
+          para agregar un vértice nuevo ahí. Los polígonos rosados de fondo son los CP ya calculados (referencia visual).
+        </p>
+        <div id="editMapDiv"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelEdit" class="secondary">Cancelar</button>
+        <button id="btnSaveEdit">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>window.CP_DATA = {};</script>
+<script src="firebase-config.js"></script>
+<script src="lib/turf.min.js"></script>
+<script src="lib/match-core.js"></script>
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/leaflet/leaflet.js"></script>
+<script src="lib/leaflet-draw/leaflet.draw.js"></script>
+<script src="data/manifest.js"></script>
+
+<script>
+(function(){
+  var fileInput = document.getElementById('fileInput');
+  var btnExample = document.getElementById('btnExample');
+  var btnRun = document.getElementById('btnRun');
+  var btnExport = document.getElementById('btnExport');
+  var progressWrap = document.getElementById('progressWrap');
+  var progressBar = document.getElementById('progressBar');
+  var statusLine = document.getElementById('statusLine');
+  var resultsPanel = document.getElementById('resultsPanel');
+  var mapPanel = document.getElementById('mapPanel');
+  var resultsBody = document.getElementById('resultsBody');
+  var summaryCards = document.getElementById('summaryCards');
+  var emptyState = document.getElementById('emptyState');
+
+  var pendingGeocercas = null; // [{name, geometry}]
+  var lastRows = [];
+  var sortState = { key: 'cp', dir: 1 };
+  var lastCpFeaturesAll = []; // todos los CP de los estados cargados en el último cálculo
+  var lastGeocercasRun = [];
+  var editLeafletMap = null;
+  var editLayer = null;
+  var editingGeocercaId = null;
+  var editingIsMulti = false;
+
+  // ---------- Modo colaborativo (Firebase: Auth + Firestore) ----------
+  // Si firebase-config.js trae un FIREBASE_CONFIG real, la app entra en modo
+  // "nube": varias personas comparten las MISMAS geocercas, sincronizadas casi
+  // al instante. Si no hay config (el caso por default), nada de esto corre y
+  // la app funciona 100% local/offline como siempre.
+  var cloudMode = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
+  var cloudUser = null;
+  var cloudDb = null;
+  var cloudUnsub = null;
+  var cloudWorkspaceId = 'movicarga-bajio';
+  var applyingRemoteUpdate = false;
+  var pendingCloudUpdate = null;
+  var FIREBASE_SDK_VERSION = '12.16.0';
+
+  function loadScriptTag(src){
+    return new Promise(function(resolve, reject){
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('No se pudo cargar ' + src + ' (revisa tu conexión a internet).')); };
+      document.body.appendChild(s);
+    });
+  }
+
+  function loadFirebaseSdks(){
+    var base = 'https://www.gstatic.com/firebasejs/' + FIREBASE_SDK_VERSION + '/';
+    return loadScriptTag(base + 'firebase-app-compat.js')
+      .then(function(){ return loadScriptTag(base + 'firebase-auth-compat.js'); })
+      .then(function(){ return loadScriptTag(base + 'firebase-firestore-compat.js'); });
+  }
+
+  function showLoginOverlay(msg){
+    document.getElementById('loginOverlay').classList.add('open');
+    document.getElementById('loginError').textContent = msg || '';
+  }
+  function hideLoginOverlay(){
+    document.getElementById('loginOverlay').classList.remove('open');
+  }
+
+  function applyRemoteSnapshot(data){
+    applyingRemoteUpdate = true;
+    pendingGeocercas = data.geocercas || [];
+    if(typeof data.maxAutoId === 'number') geocercaAutoId = Math.max(geocercaAutoId, data.maxAutoId);
+    var nDisabled = pendingGeocercas.filter(function(g){return g.enabled===false;}).length;
+    document.getElementById('enabledRow').style.display = nDisabled ? 'flex' : 'none';
+    document.getElementById('disabledCount').textContent = nDisabled;
+    document.getElementById('editPanel').style.display = pendingGeocercas.length ? 'block' : 'none';
+    btnRun.disabled = !pendingGeocercas.length;
+    renderGeocercaList();
+    applyingRemoteUpdate = false;
+    var who = data.lastEditedBy ? (' (por ' + data.lastEditedBy + ')') : '';
+    setStatus(pendingGeocercas.length + ' geocerca(s) sincronizadas' + who + '. Pulsa "Calcular cruce" para (re)generar resultados y mapa.');
+  }
+
+  function startCloudSync(){
+    var docRef = cloudDb.collection('workspaces').doc(cloudWorkspaceId);
+    cloudUnsub = docRef.onSnapshot(function(snap){
+      if(!snap.exists) return; // nadie ha subido geocercas todavía en este workspace
+      var data = snap.data();
+      if(!data || !data.geocercas) return;
+      if(editingGeocercaId){
+        // hay un modal de edición abierto: no lo interrumpimos, se aplica al cerrar
+        pendingCloudUpdate = data;
+        setStatus('Tu compañero actualizó geocercas. Se aplicará al cerrar este editor.');
+        return;
+      }
+      applyRemoteSnapshot(data);
+    }, function(err){
+      setStatus('Error de sincronización con la nube: ' + err.message);
+    });
+  }
+
+  function stopCloudSync(){
+    if(cloudUnsub){ cloudUnsub(); cloudUnsub = null; }
+  }
+
+  function pushToCloud(){
+    if(!cloudMode || !cloudUser || applyingRemoteUpdate) return;
+    if(!pendingGeocercas || !pendingGeocercas.length) return;
+    cloudDb.collection('workspaces').doc(cloudWorkspaceId).set({
+      geocercas: pendingGeocercas,
+      maxAutoId: geocercaAutoId,
+      lastEditedBy: cloudUser.email,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(function(err){
+      setStatus('No se pudo guardar en la nube: ' + err.message);
+    });
+  }
+
+  function initCloudModeIfConfigured(){
+    if(!cloudMode) return;
+    setStatus('Conectando con el modo colaborativo...');
+    loadFirebaseSdks().then(function(){
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+      cloudDb = firebase.firestore();
+      firebase.auth().onAuthStateChanged(function(user){
+        if(user){
+          cloudUser = user;
+          hideLoginOverlay();
+          document.getElementById('authWho').textContent = 'Conectado como ' + user.email;
+          document.getElementById('authBadge').classList.add('show');
+          setStatus('Modo colaborativo activo. Sincronizando geocercas...');
+          startCloudSync();
+        } else {
+          cloudUser = null;
+          stopCloudSync();
+          document.getElementById('authBadge').classList.remove('show');
+          document.getElementById('authWho').textContent = '';
+          showLoginOverlay();
+        }
+      });
+    }).catch(function(err){
+      setStatus('No se pudo activar el modo colaborativo: ' + err.message);
+    });
+  }
+
+  document.getElementById('btnLogin').addEventListener('click', function(){
+    var email = document.getElementById('loginEmail').value.trim();
+    var pass = document.getElementById('loginPassword').value;
+    if(!email || !pass){ document.getElementById('loginError').textContent = 'Escribe tu correo y contraseña.'; return; }
+    document.getElementById('loginError').textContent = 'Entrando...';
+    firebase.auth().signInWithEmailAndPassword(email, pass).catch(function(err){
+      document.getElementById('loginError').textContent = 'No se pudo entrar: ' + err.message;
+    });
+  });
+  document.getElementById('loginPassword').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') document.getElementById('btnLogin').click();
+  });
+  document.getElementById('btnLogout').addEventListener('click', function(){
+    if(cloudMode && firebase.auth) firebase.auth().signOut();
+  });
+
+  // ---------- Autoguardado de sesión (localStorage) ----------
+  // Permite editar geocercas por partes y continuar después sin tener que
+  // descargar/volver a cargar un JSON: el progreso vive en el navegador.
+  var SESSION_KEY = 'geocarga_analyzer_session_v1';
+
+  function saveSession(){
+    if(!pendingGeocercas || !pendingGeocercas.length) return;
+    if(cloudMode){
+      pushToCloud();
+      var noteC = document.getElementById('autosaveNote');
+      if(noteC){
+        var dC = new Date();
+        var hhC = String(dC.getHours()).padStart(2,'0'), mmC = String(dC.getMinutes()).padStart(2,'0'), ssC = String(dC.getSeconds()).padStart(2,'0');
+        noteC.textContent = 'Sincronizado con tu equipo a las ' + hhC + ':' + mmC + ':' + ssC + '.';
+      }
+      return;
+    }
+    try{
+      var payload = { savedAt: new Date().toISOString(), geocercas: pendingGeocercas };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+      var note = document.getElementById('autosaveNote');
+      if(note){
+        var d = new Date();
+        var hh = String(d.getHours()).padStart(2,'0'), mm = String(d.getMinutes()).padStart(2,'0'), ss = String(d.getSeconds()).padStart(2,'0');
+        note.textContent = 'Guardado automáticamente a las ' + hh + ':' + mm + ':' + ss + ' en este navegador. Al reabrir este HTML aquí mismo, podrás continuar donde te quedaste.';
+      }
+    }catch(e){
+      var note2 = document.getElementById('autosaveNote');
+      if(note2) note2.textContent = 'No se pudo autoguardar (almacenamiento del navegador lleno o bloqueado). Descarga el KML seguido para no perder cambios.';
+    }
+  }
+
+  function loadSavedSession(){
+    try{
+      var raw = localStorage.getItem(SESSION_KEY);
+      if(!raw) return null;
+      var parsed = JSON.parse(raw);
+      if(!parsed || !parsed.geocercas || !parsed.geocercas.length) return null;
+      return parsed;
+    }catch(e){ return null; }
+  }
+
+  function clearSavedSession(){
+    try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  }
+
+  function restoreSession(saved){
+    pendingGeocercas = saved.geocercas;
+    // evitar que los próximos _id autogenerados choquen con los ya guardados
+    pendingGeocercas.forEach(function(g){
+      var n = parseInt(String(g._id||'').replace('g',''), 10);
+      if(!isNaN(n) && n > geocercaAutoId) geocercaAutoId = n;
+    });
+    btnRun.disabled = false;
+    var nDisabled = pendingGeocercas.filter(function(g){return g.enabled===false;}).length;
+    document.getElementById('enabledRow').style.display = nDisabled ? 'flex' : 'none';
+    document.getElementById('disabledCount').textContent = nDisabled;
+    document.getElementById('editPanel').style.display = 'block';
+    renderGeocercaList();
+    setStatus(pendingGeocercas.length + ' geocerca(s) restauradas de tu sesión guardada. Pulsa "Calcular cruce" para (re)generar resultados y mapa.');
+  }
+
+  function checkForSavedSession(){
+    var saved = loadSavedSession();
+    if(!saved) return;
+    var banner = document.getElementById('sessionBanner');
+    var text = document.getElementById('sessionBannerText');
+    var d = new Date(saved.savedAt);
+    var fecha = isNaN(d.getTime()) ? '' : (' — guardada el ' + d.toLocaleDateString('es-MX') + ' a las ' + d.toLocaleTimeString('es-MX'));
+    text.textContent = 'Se encontró una sesión guardada con ' + saved.geocercas.length + ' geocerca(s)' + fecha + '.';
+    banner.classList.add('show');
+    document.getElementById('btnRestoreSession').addEventListener('click', function(){
+      banner.classList.remove('show');
+      restoreSession(saved);
+    });
+    document.getElementById('btnDiscardSession').addEventListener('click', function(){
+      clearSavedSession();
+      banner.classList.remove('show');
+    });
+  }
+
+  function setStatus(msg){ statusLine.textContent = msg || ''; }
+
+  function showProgress(show){ progressWrap.style.display = show ? 'block' : 'none'; }
+  function setProgress(pct){ progressBar.style.width = Math.max(0,Math.min(100,pct)) + '%'; }
+
+  // ---------- 1. Parseo de geocercas ----------
+  var geocercaAutoId = 0;
+  function extractGeocercasFromGeoJSON(gj, fallbackPrefix){
+    var out = [];
+    var idx = 0;
+    function pushGeom(geom, name, enabled, colorCode){
+      if(!geom) return;
+      if(geom.type === 'Polygon' || geom.type === 'MultiPolygon'){
+        idx++;
+        geocercaAutoId++;
+        out.push({
+          _id: 'g' + geocercaAutoId,
+          name: name || (fallbackPrefix + ' ' + idx),
+          geometry: geom,
+          enabled: enabled !== false,
+          colorCode: colorCode || null,
+          edited: false
+        });
+      } else if(geom.type === 'GeometryCollection'){
+        (geom.geometries||[]).forEach(function(g){ pushGeom(g, name, enabled, colorCode); });
+      }
+    }
+    function nameOf(f){
+      var p = f.properties || {};
+      // algunos exportadores (p. ej. sistemas de ruteo) ponen el nombre
+      // al nivel del Feature en vez de dentro de "properties" (fuera del
+      // estándar GeoJSON estricto, pero muy común en la práctica).
+      return f.name || f.nombre || p.name || p.nombre || p.Name || p.NOMBRE || null;
+    }
+    function enabledOf(f){
+      return f.enabled !== false;
+    }
+    function colorOf(f){
+      var p = f.properties || {};
+      return f.colorCode || p.colorCode || p.color || null;
+    }
+    if(gj.type === 'FeatureCollection'){
+      (gj.features||[]).forEach(function(f){
+        pushGeom(f.geometry, nameOf(f), enabledOf(f), colorOf(f));
+      });
+    } else if(gj.type === 'Feature'){
+      pushGeom(gj.geometry, nameOf(gj), enabledOf(gj), colorOf(gj));
+    } else if(gj.type === 'Polygon' || gj.type === 'MultiPolygon' || gj.type === 'GeometryCollection'){
+      pushGeom(gj, null, true, null);
+    }
+    return out;
+  }
+
+  function readFileAsJSON(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){
+        try{ resolve(JSON.parse(reader.result)); }
+        catch(e){ reject(new Error('El archivo "' + file.name + '" no es un JSON válido.')); }
+      };
+      reader.onerror = function(){ reject(new Error('No se pudo leer "' + file.name + '".')); };
+      reader.readAsText(file);
+    });
+  }
+
+  fileInput.addEventListener('change', function(){
+    var files = Array.prototype.slice.call(fileInput.files || []);
+    if(!files.length){ pendingGeocercas = null; btnRun.disabled = true; return; }
+    setStatus('Leyendo ' + files.length + ' archivo(s)...');
+    Promise.all(files.map(function(f){ return readFileAsJSON(f); }))
+      .then(function(jsons){
+        var all = [];
+        jsons.forEach(function(gj, i){
+          var prefix = files.length > 1 ? files[i].name.replace(/\.[^.]+$/, '') : 'Geocerca';
+          all = all.concat(extractGeocercasFromGeoJSON(gj, prefix));
+        });
+        if(!all.length) throw new Error('No se encontraron polígonos válidos (Polygon/MultiPolygon) en el archivo.');
+        pendingGeocercas = all;
+        btnRun.disabled = false;
+        var nDisabled = all.filter(function(g){return g.enabled===false;}).length;
+        document.getElementById('enabledRow').style.display = nDisabled ? 'flex' : 'none';
+        document.getElementById('disabledCount').textContent = nDisabled;
+        setStatus(all.length + ' geocerca(s) detectada(s)' + (nDisabled ? ' (' + nDisabled + ' marcadas como desactivadas, excluidas por default)' : '') + ': ' + all.map(function(g){return g.name + (g.enabled===false?' [desactivada]':'');}).join(', '));
+        document.getElementById('editPanel').style.display = 'block';
+        renderGeocercaList();
+        saveSession();
+      })
+      .catch(function(err){
+        pendingGeocercas = null;
+        btnRun.disabled = true;
+        setStatus('Error: ' + err.message);
+      });
+  });
+
+  btnExample.addEventListener('click', function(){
+    // Geocerca de ejemplo: cubre parte del centro de Querétaro (para probar la herramienta)
+    var example = {
+      type: 'FeatureCollection',
+      features: [
+        { type:'Feature', properties:{ name:'Ejemplo Centro QRO' }, geometry: {
+          type:'Polygon', coordinates:[[
+            [-100.42,20.58],[-100.36,20.58],[-100.36,20.63],[-100.42,20.63],[-100.42,20.58]
+          ]]
+        }}
+      ]
+    };
+    pendingGeocercas = extractGeocercasFromGeoJSON(example, 'Geocerca');
+    btnRun.disabled = false;
+    document.getElementById('enabledRow').style.display = 'none';
+    document.getElementById('editPanel').style.display = 'block';
+    renderGeocercaList();
+    setStatus('Ejemplo cargado: geocerca sobre el centro de Querétaro. Pulsa "Calcular cruce".');
+    saveSession();
+  });
+
+  // ---------- 2. Carga perezosa de estados necesarios ----------
+  function statesNeeded(geocercas){
+    var combined = null;
+    geocercas.forEach(function(g){
+      var b = turf.bbox(turf.feature(g.geometry));
+      if(!combined) combined = b.slice();
+      else{
+        combined[0] = Math.min(combined[0], b[0]);
+        combined[1] = Math.min(combined[1], b[1]);
+        combined[2] = Math.max(combined[2], b[2]);
+        combined[3] = Math.max(combined[3], b[3]);
+      }
+    });
+    var needed = [];
+    Object.keys(CP_MANIFEST).forEach(function(key){
+      var sb = CP_MANIFEST[key].bbox;
+      if(MatchCore.bboxOverlap(combined, sb, 0.02)) needed.push(key);
+    });
+    return needed;
+  }
+
+  function loadStateScript(key){
+    return new Promise(function(resolve, reject){
+      if(window.CP_DATA[key]){ resolve(); return; }
+      var s = document.createElement('script');
+      s.src = 'data/' + key + '.js';
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('No se pudo cargar data/' + key + '.js (¿mantuviste la carpeta "data" junto al HTML?)')); };
+      document.body.appendChild(s);
+    });
+  }
+
+  // ---------- 3. Cálculo ----------
+  btnRun.addEventListener('click', function(){
+    if(!pendingGeocercas) return;
+    btnRun.disabled = true;
+    fileInput.disabled = true;
+    showProgress(true); setProgress(0);
+
+    var includeDisabled = document.getElementById('includeDisabled').checked;
+    var activeGeocercas = includeDisabled ? pendingGeocercas :
+      pendingGeocercas.filter(function(g){ return g.enabled !== false; });
+    if(!activeGeocercas.length){
+      setStatus('Todas las geocercas cargadas están desactivadas. Marca "Incluir geocercas desactivadas" si quieres analizarlas de todos modos.');
+      btnRun.disabled = false; fileInput.disabled = false; showProgress(false);
+      return;
+    }
+    setStatus('Determinando estados relevantes (' + activeGeocercas.length + ' geocerca(s) activa(s) de ' + pendingGeocercas.length + ')...');
+
+    var needed = statesNeeded(activeGeocercas);
+    if(!needed.length){
+      setStatus('Las geocercas no caen dentro de ningún estado de México reconocido.');
+      btnRun.disabled = false; fileInput.disabled = false; showProgress(false);
+      return;
+    }
+    setStatus('Cargando datos de: ' + needed.map(function(k){return CP_MANIFEST[k].name;}).join(', ') + '...');
+
+    var loaded = 0;
+    Promise.all(needed.map(function(k){
+      return loadStateScript(k).then(function(){
+        loaded++; setProgress(30 * loaded/needed.length);
+      });
+    })).then(function(){
+      setStatus('Calculando intersecciones...');
+      var cpFeatures = [];
+      needed.forEach(function(key){
+        var fc = window.CP_DATA[key];
+        var estadoName = CP_MANIFEST[key].name;
+        fc.features.forEach(function(f){
+          cpFeatures.push({ cp: f.properties.cp, estado: estadoName, geometry: f.geometry });
+        });
+      });
+
+      MatchCore.computeMatchesChunked(activeGeocercas, cpFeatures, function(done, total){
+        setProgress(30 + 70 * done/total);
+        setStatus('Calculando intersecciones... ' + done + ' / ' + total + ' códigos postales revisados');
+      }, function(rows){
+        lastRows = rows;
+        lastCpFeaturesAll = cpFeatures;
+        lastGeocercasRun = activeGeocercas;
+        showProgress(false);
+        setStatus(rows.length + ' filas de resultado (' + cpFeatures.length + ' CPs revisados en ' + needed.length + ' estado(s)).');
+        btnRun.disabled = false; fileInput.disabled = false;
+        renderResults(rows, cpFeatures, activeGeocercas);
+      });
+    }).catch(function(err){
+      setStatus('Error: ' + err.message);
+      btnRun.disabled = false; fileInput.disabled = false; showProgress(false);
+    });
+  });
+
+  // ---------- 4. Render de resultados ----------
+  function renderResults(rows, cpFeatures, geocercas){
+    resultsPanel.style.display = 'block';
+    mapPanel.style.display = 'block';
+
+    // filtros
+    var estados = Array.from(new Set(rows.map(function(r){return r.estado;}))).sort();
+    var geoNames = Array.from(new Set(rows.map(function(r){return r.geocerca;}))).sort();
+    fillSelect('filterEstado', estados, 'Todos los estados');
+    fillSelect('filterGeocerca', geoNames, 'Todas las geocercas');
+
+    applyFiltersAndRender();
+
+    drawMap(cpFeatures, geocercas, rows);
+  }
+
+  function fillSelect(id, values, allLabel){
+    var sel = document.getElementById(id);
+    sel.innerHTML = '<option value="">' + allLabel + '</option>' +
+      values.map(function(v){ return '<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>'; }).join('');
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function currentFilters(){
+    return {
+      cp: document.getElementById('filterCp').value.trim(),
+      estado: document.getElementById('filterEstado').value,
+      geocerca: document.getElementById('filterGeocerca').value,
+      clase: document.getElementById('filterClass').value,
+      onlySplit: document.getElementById('onlySplit').checked
+    };
+  }
+  function rowPassesFilters(r, f){
+    if(f.cp && String(r.cp).indexOf(f.cp) === -1) return false;
+    if(f.estado && r.estado !== f.estado) return false;
+    if(f.geocerca && r.geocerca !== f.geocerca) return false;
+    if(f.clase && r.clasificacionTotal !== f.clase) return false;
+    if(f.onlySplit && r.clasificacionTotal !== 'Partido entre geocercas') return false;
+    return true;
+  }
+
+  function applyFiltersAndRender(){
+    var f = currentFilters();
+    var filtered = lastRows.filter(function(r){ return rowPassesFilters(r, f); });
+    filtered.sort(function(a,b){
+      var k = sortState.key, d = sortState.dir;
+      var av = a[k], bv = b[k];
+      if(typeof av === 'string') return d * av.localeCompare(bv);
+      return d * (av - bv);
+    });
+    renderTable(filtered);
+    renderSummary(filtered);
+  }
+
+  ['filterCp','filterEstado','filterGeocerca','filterClass','onlySplit'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', applyFiltersAndRender);
+    document.getElementById(id).addEventListener('change', applyFiltersAndRender);
+  });
+
+  document.querySelectorAll('#resultsTable th').forEach(function(th){
+    th.addEventListener('click', function(){
+      var key = th.getAttribute('data-key');
+      if(sortState.key === key) sortState.dir *= -1;
+      else { sortState.key = key; sortState.dir = 1; }
+      applyFiltersAndRender();
+    });
+  });
+
+  function badgeClassFor(clasificacion){
+    if(clasificacion === 'Completo') return 'completo';
+    if(clasificacion === 'Partido entre geocercas') return 'partido-entre';
+    if(clasificacion === 'Marginal') return 'marginal';
+    return 'partido'; // Partido / Partido (zona incompleta)
+  }
+
+  function renderTable(rows){
+    if(!rows.length){
+      resultsBody.innerHTML = '';
+      emptyState.style.display = 'block';
+      return;
+    }
+    emptyState.style.display = 'none';
+    var html = rows.map(function(r){
+      var badgeClass = r.clasificacion === 'Completo' ? 'completo' : 'partido';
+      return '<tr>' +
+        '<td>' + r.cp + '</td>' +
+        '<td>' + escapeHtml(r.estado) + '</td>' +
+        '<td>' + escapeHtml(r.geocerca) + '</td>' +
+        '<td>' + r.pct.toFixed(1) + '%</td>' +
+        '<td><span class="badge ' + badgeClass + '">' + r.clasificacion + '</span></td>' +
+        '<td>' + r.pctTotalCp.toFixed(1) + '%</td>' +
+        '<td><span class="badge ' + badgeClassFor(r.clasificacionTotal) + '">' + r.clasificacionTotal + '</span></td>' +
+        '<td>' + (r.nGeocercas > 1 ? escapeHtml(r.geocercasInvolucradas) : '—') + '</td>' +
+        '</tr>';
+    }).join('');
+    resultsBody.innerHTML = html;
+  }
+
+  function renderSummary(rows){
+    var cps = new Set(rows.map(function(r){return r.cp;}));
+    var completos = new Set(rows.filter(function(r){return r.clasificacionTotal==='Completo';}).map(function(r){return r.cp;}));
+    var entreGeocercas = new Set(rows.filter(function(r){return r.clasificacionTotal==='Partido entre geocercas';}).map(function(r){return r.cp;}));
+    var zonaIncompleta = new Set(rows.filter(function(r){return r.clasificacionTotal==='Partido (zona incompleta)';}).map(function(r){return r.cp;}));
+    var estados = new Set(rows.map(function(r){return r.estado;}));
+    summaryCards.innerHTML = [
+      card(cps.size, 'CPs involucrados'),
+      card(completos.size, 'Completos'),
+      card(entreGeocercas.size, 'Partidos entre geocercas'),
+      card(zonaIncompleta.size, 'Partidos (zona incompleta)'),
+      card(estados.size, 'Estados')
+    ].join('');
+  }
+  function card(num, lbl){
+    return '<div class="card"><div class="num">'+num+'</div><div class="lbl">'+lbl+'</div></div>';
+  }
+
+  // ---------- 5. Exportar a Excel ----------
+  btnExport.addEventListener('click', function(){
+    if(!lastRows.length){ return; }
+    var f = currentFilters();
+    var rows = lastRows.filter(function(r){ return rowPassesFilters(r, f); });
+    var data = rows.map(function(r){
+      return {
+        'Código Postal': r.cp,
+        'Estado': r.estado,
+        'Geocerca': r.geocerca,
+        '% en esta geocerca': Number(r.pct.toFixed(2)),
+        'Clasificación (en esta geocerca)': r.clasificacion,
+        '% total cubierto del CP': Number(r.pctTotalCp.toFixed(2)),
+        'Estatus del CP': r.clasificacionTotal,
+        'Geocercas involucradas': r.nGeocercas > 1 ? r.geocercasInvolucradas : ''
+      };
+    });
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{wch:12},{wch:16},{wch:22},{wch:18},{wch:24},{wch:20},{wch:22},{wch:30}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Cruce CP-Geocerca');
+
+    // hoja resumen
+    var cps = new Set(rows.map(function(r){return r.cp;}));
+    var completos = new Set(rows.filter(function(r){return r.clasificacionTotal==='Completo';}).map(function(r){return r.cp;}));
+    var entreGeocercas = new Set(rows.filter(function(r){return r.clasificacionTotal==='Partido entre geocercas';}).map(function(r){return r.cp;}));
+    var zonaIncompleta = new Set(rows.filter(function(r){return r.clasificacionTotal==='Partido (zona incompleta)';}).map(function(r){return r.cp;}));
+    var resumen = [
+      {Métrica:'CPs involucrados', Valor: cps.size},
+      {Métrica:'CPs completos', Valor: completos.size},
+      {Métrica:'CPs partidos entre geocercas', Valor: entreGeocercas.size},
+      {Métrica:'CPs partidos (zona incompleta)', Valor: zonaIncompleta.size},
+      {Métrica:'Generado', Valor: new Date().toLocaleString('es-MX')}
+    ];
+    var ws2 = XLSX.utils.json_to_sheet(resumen);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Resumen');
+
+    // hoja dedicada solo a los partidos entre geocercas (la vista que más importa operativamente)
+    var soloEntre = rows.filter(function(r){return r.clasificacionTotal==='Partido entre geocercas';});
+    if(soloEntre.length){
+      var dataEntre = soloEntre.map(function(r){
+        return {
+          'Código Postal': r.cp, 'Estado': r.estado, 'Geocerca': r.geocerca,
+          '% en esta geocerca': Number(r.pct.toFixed(2)),
+          '% total cubierto del CP': Number(r.pctTotalCp.toFixed(2)),
+          'Geocercas involucradas': r.geocercasInvolucradas
+        };
+      });
+      var ws3 = XLSX.utils.json_to_sheet(dataEntre);
+      XLSX.utils.book_append_sheet(wb, ws3, 'Partidos entre geocercas');
+    }
+
+    XLSX.writeFile(wb, 'cruce_cp_geocerca_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  });
+
+  // ---------- 6. Mapa con Leaflet (mapa real de fondo + zoom/desplazamiento nativos) ----------
+  var leafletMap = null;
+  var leafletLayerGroup = null;
+  var searchHighlightLayer = null;
+  var searchHighlightTimer = null;
+
+  function ensureLeafletMap(){
+    if(leafletMap) return;
+    leafletMap = L.map('mapDiv', { zoomControl: true, scrollWheelZoom: true, worldCopyJump: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(leafletMap);
+    leafletLayerGroup = L.layerGroup().addTo(leafletMap);
+    searchHighlightLayer = L.layerGroup().addTo(leafletMap);
+    leafletMap.setView([21.0, -101.3], 9); // vista inicial: Bajío / Guanajuato
+  }
+
+  // normaliza un CP a 5 dígitos con ceros a la izquierda para comparar
+  // (algunos CP de México, p. ej. CDMX, empiezan en 0 y el dato se guarda como número)
+  function normCp(v){
+    return String(v).replace(/\D/g,'').padStart(5,'0');
+  }
+
+  // arma la info de un CP (geocercas + % + estatus) a partir del último cálculo
+  function buildCpInfo(cp, estado){
+    var cpRows = lastRows.filter(function(r){ return r.cp === cp; });
+    if(cpRows.length){
+      var geoList = cpRows.map(function(r){
+        return escapeHtml(r.geocerca) + ': ' + r.pct.toFixed(1) + '%';
+      });
+      var estatus = cpRows[0].clasificacionTotal;
+      var totalPct = cpRows[0].pctTotalCp;
+      return {
+        popupHtml: '<b>CP ' + cp + '</b><br>' + geoList.join('<br>') +
+          '<br><i>' + estatus + ' (' + totalPct.toFixed(1) + '% total)</i>',
+        statusText: 'CP ' + cp + ' (' + estado + ') — ' + estatus + ': ' +
+          cpRows.map(function(r){ return r.geocerca + ' ' + r.pct.toFixed(1) + '%'; }).join(', ') +
+          ' · ' + totalPct.toFixed(1) + '% total.'
+      };
+    }
+    return {
+      popupHtml: '<b>CP ' + cp + '</b><br>Sin cruce con tus geocercas',
+      statusText: 'CP ' + cp + ' (' + estado + ') — sin cruce con ninguna de tus geocercas.'
+    };
+  }
+
+  function searchCpOnMap(){
+    var statusEl = document.getElementById('searchCpStatus');
+    var raw = document.getElementById('searchCpInput').value.trim();
+    if(!raw){ statusEl.textContent = ''; return; }
+    if(!lastCpFeaturesAll.length){
+      statusEl.textContent = 'Primero calcula un cruce.';
+      return;
+    }
+    var target = normCp(raw);
+    var match = lastCpFeaturesAll.find(function(cf){ return normCp(cf.cp) === target; });
+    if(!match){
+      statusEl.textContent = 'CP ' + raw + ' no está en los estados ya cargados (' +
+        Array.from(new Set(lastCpFeaturesAll.map(function(cf){return cf.estado;}))).join(', ') + ').';
+      return;
+    }
+    ensureLeafletMap();
+    if(searchHighlightTimer) clearTimeout(searchHighlightTimer);
+    searchHighlightLayer.clearLayers();
+
+    var feature = turf.feature(match.geometry);
+    var bounds = turf.bbox(feature);
+    var leafletBounds = [[bounds[1],bounds[0]],[bounds[3],bounds[2]]];
+    leafletMap.flyToBounds(leafletBounds, { maxZoom: 15, duration: 0.8 });
+
+    var info = buildCpInfo(match.cp, match.estado);
+
+    var hl = L.geoJSON(match.geometry, {
+      style: { color:'#ffffff', weight:3, fillColor:'#ffffff', fillOpacity:0.15, dashArray:'6,4' }
+    });
+    hl.bindTooltip(info.popupHtml, { permanent:true, direction:'center', className:'cp-search-tooltip' }).openTooltip();
+    hl.addTo(searchHighlightLayer);
+
+    statusEl.textContent = info.statusText;
+    searchHighlightTimer = setTimeout(function(){ searchHighlightLayer.clearLayers(); }, 15000);
+  }
+
+  document.getElementById('btnSearchCp').addEventListener('click', searchCpOnMap);
+  document.getElementById('searchCpInput').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') searchCpOnMap();
+  });
+
+  function drawMap(cpFeatures, geocercas, rows){
+    ensureLeafletMap();
+    leafletLayerGroup.clearLayers();
+
+    var relevantCps = new Set(rows.map(function(r){return r.cp;}));
+    var cpByCode = {};
+    cpFeatures.forEach(function(cf){ if(relevantCps.has(cf.cp)) cpByCode[cf.cp] = cf; });
+
+    var classByCode = {};
+    var priority = {'Partido entre geocercas':3,'Partido (zona incompleta)':2,'Completo':1,'Marginal':0};
+    rows.forEach(function(r){
+      var prev = classByCode[r.cp];
+      if(!prev || priority[r.clasificacionTotal] > priority[prev]) classByCode[r.cp] = r.clasificacionTotal;
+    });
+
+    var colorFor = {'Completo':'#59d499','Partido (zona incompleta)':'#f5a623','Partido entre geocercas':'#ff6b6b','Marginal':'#93a4b3'};
+    var boundsLayers = [];
+
+    Object.keys(cpByCode).forEach(function(cp){
+      var cls = classByCode[cp];
+      var fill = colorFor[cls] || '#f5a623';
+      var estadoCp = cpByCode[cp].estado;
+      var layer = L.geoJSON(cpByCode[cp].geometry, {
+        style: { color:'#0b1219', weight:0.6, fillColor: fill, fillOpacity: cls==='Partido entre geocercas' ? 0.65 : 0.45 }
+      });
+      layer.on('click', function(e){
+        var info = buildCpInfo(Number(cp), estadoCp);
+        L.popup({ className:'cp-search-tooltip' })
+          .setLatLng(e.latlng)
+          .setContent(info.popupHtml)
+          .openOn(leafletMap);
+        var statusEl = document.getElementById('searchCpStatus');
+        if(statusEl) statusEl.textContent = info.statusText;
+        var searchInput = document.getElementById('searchCpInput');
+        if(searchInput) searchInput.value = cp;
+      });
+      layer.addTo(leafletLayerGroup);
+      boundsLayers.push(layer);
+    });
+
+    geocercas.forEach(function(g){
+      // interactive:false para que el contorno de la geocerca NO tape los clics/hover
+      // de los polígonos de CP que están debajo; el contorno queda solo visual.
+      // Halo blanco grueso por debajo + línea morada encima: se distingue del fondo
+      // sin importar si cae sobre verde/naranja/rojo/mapa claro.
+      var halo = L.geoJSON(g.geometry, {
+        interactive: false,
+        style: { color:'#ffffff', weight:6, opacity:0.9, fill:false }
+      });
+      halo.addTo(leafletLayerGroup);
+      var layer = L.geoJSON(g.geometry, {
+        interactive: false,
+        style: { color:'#7c1fd6', weight:3, fillColor:'#7c1fd6', fillOpacity:0.05 }
+      });
+      layer.addTo(leafletLayerGroup);
+      boundsLayers.push(layer);
+    });
+
+    if(boundsLayers.length){
+      var group = L.featureGroup(boundsLayers);
+      leafletMap.fitBounds(group.getBounds().pad(0.08));
+    }
+    setTimeout(function(){ leafletMap.invalidateSize(); }, 50);
+  }
+
+  // ---------- 7. Lista de geocercas + edición de vértices + exportar KML ----------
+  // exportSelection: qué geocercas se incluyen al descargar KML (por _id). Por default, todas.
+  var exportSelection = {};
+  function isSelectedForExport(id){
+    return exportSelection.hasOwnProperty(id) ? exportSelection[id] : true;
+  }
+  function updatePickCount(){
+    var el = document.getElementById('pickCount');
+    if(!el || !pendingGeocercas) return;
+    var n = pendingGeocercas.filter(function(g){ return isSelectedForExport(g._id); }).length;
+    el.textContent = n + ' de ' + pendingGeocercas.length + ' seleccionadas';
+  }
+  function renderGeocercaList(){
+    var list = document.getElementById('geocercaList');
+    if(!pendingGeocercas || !pendingGeocercas.length){ list.innerHTML = ''; updatePickCount(); return; }
+    list.innerHTML = pendingGeocercas.map(function(g){
+      var color = g.colorCode || '#3ea6ff';
+      var tags = '';
+      if(g.enabled === false) tags += '<span class="gtag off">desactivada</span>';
+      if(g.edited) tags += '<span class="gtag edited">editada</span>';
+      var checked = isSelectedForExport(g._id) ? ' checked' : '';
+      return '<div class="geocerca-row">' +
+        '<input type="checkbox" class="gcheck" data-check-id="' + g._id + '" title="Incluir en la descarga de KML"' + checked + '>' +
+        '<span class="swatch2" style="background:' + escapeHtml(color) + '"></span>' +
+        '<span class="gname">' + escapeHtml(g.name) + '</span>' +
+        tags +
+        '<button class="secondary" data-edit-id="' + g._id + '">Editar</button>' +
+        '</div>';
+    }).join('');
+    list.querySelectorAll('[data-edit-id]').forEach(function(btn){
+      btn.addEventListener('click', function(){ openEditModal(btn.getAttribute('data-edit-id')); });
+    });
+    list.querySelectorAll('[data-check-id]').forEach(function(cb){
+      cb.addEventListener('change', function(){
+        exportSelection[cb.getAttribute('data-check-id')] = cb.checked;
+        updatePickCount();
+      });
+    });
+    updatePickCount();
+  }
+
+  function geoJSONToEditLatLngs(geometry){
+    if(geometry.type === 'MultiPolygon'){
+      return {
+        isMulti: true,
+        latlngs: geometry.coordinates.map(function(poly){
+          return poly.map(function(ring){
+            return ring.map(function(pt){ return [pt[1], pt[0]]; });
+          });
+        })
+      };
+    }
+    return {
+      isMulti: false,
+      latlngs: geometry.coordinates.map(function(ring){
+        return ring.map(function(pt){ return [pt[1], pt[0]]; });
+      })
+    };
+  }
+
+  function editLatLngsToGeoJSON(latlngs, isMulti){
+    function ringToCoords(ring){
+      var coords = ring.map(function(p){ return [Number(p.lng.toFixed(6)), Number(p.lat.toFixed(6))]; });
+      var first = coords[0], last = coords[coords.length - 1];
+      if(!first || !last) return coords;
+      if(first[0] !== last[0] || first[1] !== last[1]) coords.push([first[0], first[1]]);
+      return coords;
+    }
+    if(isMulti){
+      return { type: 'MultiPolygon', coordinates: latlngs.map(function(part){ return part.map(ringToCoords); }) };
+    }
+    return { type: 'Polygon', coordinates: latlngs.map(ringToCoords) };
+  }
+
+  var editCpRefLayer = null; // grupo con los CP de fondo (referencia), persiste entre aperturas
+
+  // el mapa de edición se crea UNA SOLA VEZ y se reutiliza (crear/destruir en cada apertura
+  // causaba pantalla en negro y vértices no editables por medir el contenedor con el modal
+  // todavía oculto).
+  function ensureEditMap(){
+    if(editLeafletMap) return;
+    editLeafletMap = L.map('editMapDiv', { zoomControl: true, scrollWheelZoom: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap', maxZoom: 19
+    }).addTo(editLeafletMap);
+    editCpRefLayer = L.layerGroup().addTo(editLeafletMap);
+  }
+
+  function openEditModal(id){
+    var g = pendingGeocercas.find(function(x){ return x._id === id; });
+    if(!g) return;
+    editingGeocercaId = id;
+
+    document.getElementById('editNameInput').value = g.name;
+    document.getElementById('editColorInput').value = /^#[0-9a-fA-F]{6}$/.test(g.colorCode || '') ? g.colorCode : '#3ea6ff';
+    document.getElementById('editModalTitle').textContent = 'Editar geocerca — ' + g.name;
+
+    // 1) mostrar el modal PRIMERO para que el contenedor del mapa tenga tamaño real,
+    //    2) recién después crear/():reusar el mapa de Leaflet y medirlo.
+    document.getElementById('editModalOverlay').classList.add('open');
+
+    requestAnimationFrame(function(){
+      ensureEditMap();
+
+      if(editLayer){ editLeafletMap.removeLayer(editLayer); editLayer = null; }
+      editCpRefLayer.clearLayers();
+      editLeafletMap.invalidateSize();
+
+      // 1) Primero se crea y agrega el polígono EDITABLE de la geocerca (lo esencial).
+      //    Esto va antes que las referencias de CP para que, aunque alguna referencia
+      //    falle, la edición en sí siempre quede disponible.
+      var conv = geoJSONToEditLatLngs(g.geometry);
+      editingIsMulti = conv.isMulti;
+      editLayer = L.polygon(conv.latlngs, {
+        color: '#ffffff', weight: 3, fillColor: document.getElementById('editColorInput').value, fillOpacity: 0.2
+      }).addTo(editLeafletMap);
+      editLayer.editing.enable();
+
+      var b = editLayer.getBounds();
+      if(b.isValid()) editLeafletMap.fitBounds(b.pad(0.15));
+
+      // 2) Después, los CP ya calculados como referencia visual (contorno marcado para
+      //    guiarte al editar). No son interactivos y no bloquean el arrastre de los
+      //    vértices. Cada uno se agrega con su propio try/catch: si algún polígono de
+      //    CP tiene una geometría rara, se omite ese sin tumbar el resto ni la edición.
+      if(lastCpFeaturesAll && lastCpFeaturesAll.length){
+        var gBounds;
+        try { gBounds = turf.bbox(turf.feature(g.geometry)); } catch(e){ gBounds = null; }
+        lastCpFeaturesAll.forEach(function(cf){
+          try {
+            if(gBounds){
+              var cb = turf.bbox(turf.feature(cf.geometry));
+              if(!MatchCore.bboxOverlap(gBounds, cb, 0.03)) return;
+            }
+            L.geoJSON(cf.geometry, {
+              interactive: false,
+              style: { color:'#ff5c85', weight:1.5, fillColor:'#ff5c85', fillOpacity:0.08 }
+            }).addTo(editCpRefLayer);
+          } catch(e){
+            // geometría de CP inválida para dibujar: se ignora, no debe romper la edición
+          }
+        });
+      }
+
+      setTimeout(function(){
+        if(!editLayer || !editLeafletMap) return; // el modal pudo cerrarse antes de que corriera este timer
+        editLeafletMap.invalidateSize();
+        var b2 = editLayer.getBounds();
+        if(b2.isValid()) editLeafletMap.fitBounds(b2.pad(0.15));
+      }, 120);
+    });
+  }
+
+  function closeEditModal(){
+    document.getElementById('editModalOverlay').classList.remove('open');
+    if(editLeafletMap && editLayer){ editLeafletMap.removeLayer(editLayer); }
+    editLayer = null;
+    editingGeocercaId = null;
+    if(pendingCloudUpdate){
+      var data = pendingCloudUpdate;
+      pendingCloudUpdate = null;
+      applyRemoteSnapshot(data);
+    }
+  }
+
+  document.getElementById('editModalClose').addEventListener('click', closeEditModal);
+  document.getElementById('btnCancelEdit').addEventListener('click', closeEditModal);
+  if(cloudMode) initCloudModeIfConfigured(); else checkForSavedSession();
+  document.getElementById('editColorInput').addEventListener('input', function(){
+    if(editLayer) editLayer.setStyle({ fillColor: this.value });
+  });
+
+  document.getElementById('btnSaveEdit').addEventListener('click', function(){
+    if(!editingGeocercaId || !editLayer) return;
+    var g = pendingGeocercas.find(function(x){ return x._id === editingGeocercaId; });
+    if(!g) return;
+    var newGeom = editLatLngsToGeoJSON(editLayer.getLatLngs(), editingIsMulti);
+    g.geometry = newGeom;
+    g.name = document.getElementById('editNameInput').value.trim() || g.name;
+    g.colorCode = document.getElementById('editColorInput').value;
+    g.edited = true;
+    closeEditModal();
+    renderGeocercaList();
+    saveSession();
+    document.getElementById('editStatus').textContent = 'Cambios guardados en "' + g.name + '" y autoguardados en este navegador. Vuelve a pulsar "Calcular cruce" para actualizar los resultados con la nueva forma.';
+  });
+
+  // ---------- 8. Exportar geocercas a KML ----------
+  function hexToKmlColor(hex, alpha){
+    alpha = alpha || 'ff';
+    if(!/^#[0-9a-fA-F]{6}$/.test(hex || '')) return alpha + '0000ff';
+    var r = hex.slice(1,3), gg = hex.slice(3,5), b = hex.slice(5,7);
+    return (alpha + b + gg + r).toLowerCase();
+  }
+  function ringToKmlCoords(ring){
+    return ring.map(function(pt){ return pt[0] + ',' + pt[1] + ',0'; }).join(' ');
+  }
+  function polygonToKml(coords){
+    var outer = coords[0], holes = coords.slice(1);
+    var xml = '<Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>' +
+      ringToKmlCoords(outer) + '</coordinates></LinearRing></outerBoundaryIs>';
+    holes.forEach(function(h){
+      xml += '<innerBoundaryIs><LinearRing><coordinates>' + ringToKmlCoords(h) + '</coordinates></LinearRing></innerBoundaryIs>';
+    });
+    return xml + '</Polygon>';
+  }
+  function geometryToKml(geom){
+    if(geom.type === 'Polygon') return polygonToKml(geom.coordinates);
+    if(geom.type === 'MultiPolygon') return '<MultiGeometry>' + geom.coordinates.map(polygonToKml).join('') + '</MultiGeometry>';
+    return '';
+  }
+  function escapeXml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c];
+    });
+  }
+  function geocercasToKml(geocercas, docName){
+    var activas = [], inactivas = [];
+    var styleBlocks = [], seen = {};
+    geocercas.forEach(function(g){
+      var color = hexToKmlColor(g.colorCode);
+      var styleId = 'style_' + color;
+      if(!seen[styleId]){
+        seen[styleId] = true;
+        styleBlocks.push('<Style id="' + styleId + '"><LineStyle><color>' + color + '</color><width>2</width></LineStyle>' +
+          '<PolyStyle><color>7f' + color.slice(2) + '</color></PolyStyle></Style>');
+      }
+      var placemark = '<Placemark><name>' + escapeXml(g.name) + '</name>' +
+        '<visibility>' + (g.enabled === false ? 0 : 1) + '</visibility>' +
+        '<styleUrl>#' + styleId + '</styleUrl>' +
+        geometryToKml(g.geometry) + '</Placemark>';
+      if(g.enabled === false) inactivas.push(placemark); else activas.push(placemark);
+    });
+    return '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>' +
+      escapeXml(docName) + '</name>' + styleBlocks.join('') +
+      '<Folder><name>Activas (' + activas.length + ')</name>' + activas.join('') + '</Folder>' +
+      '<Folder><name>Desactivadas (' + inactivas.length + ')</name>' + inactivas.join('') + '</Folder>' +
+      '</Document></kml>';
+  }
+
+  document.getElementById('btnSaveProgress').addEventListener('click', function(){
+    saveSession();
+    document.getElementById('editStatus').textContent = 'Progreso guardado en este navegador.';
+  });
+
+  document.getElementById('btnClearProgress').addEventListener('click', function(){
+    clearSavedSession();
+    document.getElementById('editStatus').textContent = 'Se borró el progreso guardado en este navegador (tus geocercas cargadas en pantalla no se tocaron).';
+  });
+
+  // autoguardado periódico de respaldo, por si hay ediciones en curso sin pasar por "Guardar cambios"
+  setInterval(function(){ saveSession(); }, 20000);
+  window.addEventListener('beforeunload', function(){ saveSession(); });
+
+  document.getElementById('btnPickAll').addEventListener('click', function(){
+    if(!pendingGeocercas) return;
+    pendingGeocercas.forEach(function(g){ exportSelection[g._id] = true; });
+    renderGeocercaList();
+  });
+  document.getElementById('btnPickNone').addEventListener('click', function(){
+    if(!pendingGeocercas) return;
+    pendingGeocercas.forEach(function(g){ exportSelection[g._id] = false; });
+    renderGeocercaList();
+  });
+  document.getElementById('btnPickEdited').addEventListener('click', function(){
+    if(!pendingGeocercas) return;
+    pendingGeocercas.forEach(function(g){ exportSelection[g._id] = !!g.edited; });
+    renderGeocercaList();
+  });
+
+  document.getElementById('btnDownloadKml').addEventListener('click', function(){
+    if(!pendingGeocercas || !pendingGeocercas.length){
+      document.getElementById('editStatus').textContent = 'Primero carga un archivo de geocercas.';
+      return;
+    }
+    var seleccionadas = pendingGeocercas.filter(function(g){ return isSelectedForExport(g._id); });
+    if(!seleccionadas.length){
+      document.getElementById('editStatus').textContent = 'No hay geocercas seleccionadas para descargar. Marca al menos una, o usa "Todas" / "Solo editadas".';
+      return;
+    }
+    var kml = geocercasToKml(seleccionadas, 'Geocercas Movicarga Bajío');
+    var blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'geocercas_' + new Date().toISOString().slice(0,10) + '.kml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    document.getElementById('editStatus').textContent = 'KML descargado (' + seleccionadas.length + ' de ' + pendingGeocercas.length + ' geocercas).';
+  });
+
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Reglas de seguridad para GeoCarga Analyzer (modo colaborativo).
+//
+// Cómo usarlas:
+//   Firebase console > Firestore Database > pestaña "Reglas" > pega esto > "Publicar".
+//
+// Qué hacen:
+//   - Solo usuarios que iniciaron sesión (con una cuenta que TÚ creaste a mano
+//     en Authentication) pueden leer o escribir datos.
+//   - Cualquier otra persona en internet, sin cuenta, no puede ver ni tocar
+//     nada (Firestore lo rechaza).
+//   - Todo el equipo comparte un solo "workspace" de geocercas (colección
+//     "workspaces", documento "movicarga-bajio"), que es como la app guarda
+//     y sincroniza los datos entre ustedes dos.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /workspaces/{workspaceId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
