@@ -379,7 +379,14 @@
 
   function applyRemoteSnapshot(data){
     applyingRemoteUpdate = true;
-    pendingGeocercas = data.geocercas || [];
+    var geocercasFromCloud = [];
+    try{
+      geocercasFromCloud = data.geocercasJson ? JSON.parse(data.geocercasJson) : (data.geocercas || []);
+    }catch(e){
+      geocercasFromCloud = [];
+      setStatus('Error leyendo geocercas de la nube: ' + e.message);
+    }
+    pendingGeocercas = geocercasFromCloud;
     if(typeof data.maxAutoId === 'number') geocercaAutoId = Math.max(geocercaAutoId, data.maxAutoId);
     var nDisabled = pendingGeocercas.filter(function(g){return g.enabled===false;}).length;
     document.getElementById('enabledRow').style.display = nDisabled ? 'flex' : 'none';
@@ -397,7 +404,7 @@
     cloudUnsub = docRef.onSnapshot(function(snap){
       if(!snap.exists) return; // nadie ha subido geocercas todavía en este workspace
       var data = snap.data();
-      if(!data || !data.geocercas) return;
+      if(!data || (!data.geocercasJson && !data.geocercas)) return;
       if(editingGeocercaId){
         // hay un modal de edición abierto: no lo interrumpimos, se aplica al cerrar
         pendingCloudUpdate = data;
@@ -418,7 +425,7 @@
     if(!cloudMode || !cloudUser || applyingRemoteUpdate) return;
     if(!pendingGeocercas || !pendingGeocercas.length) return;
     cloudDb.collection('workspaces').doc(cloudWorkspaceId).set({
-      geocercas: pendingGeocercas,
+      geocercasJson: JSON.stringify(pendingGeocercas),
       maxAutoId: geocercaAutoId,
       lastEditedBy: cloudUser.email,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
