@@ -350,6 +350,12 @@
   var cloudWorkspaceId = 'movicarga-bajio';
   var applyingRemoteUpdate = false;
   var pendingCloudUpdate = null;
+  // true solo cuando hay una edición LOCAL real sin subir todavía (archivo cargado,
+  // ejemplo cargado, o "Guardar cambios" en el editor). El autoguardado periódico y
+  // otros disparadores "de rutina" NO deben subir nada si esto está en false, porque
+  // si no, un navegador inactivo podía pisar con datos viejos la edición reciente de
+  // otra persona cada vez que le tocaba su autoguardado de los 20s.
+  var localDirty = false;
   var FIREBASE_SDK_VERSION = '12.16.0';
 
   function loadScriptTag(src){
@@ -379,6 +385,7 @@
 
   function applyRemoteSnapshot(data){
     applyingRemoteUpdate = true;
+    localDirty = false;
     var geocercasFromCloud = [];
     try{
       geocercasFromCloud = data.geocercasJson ? JSON.parse(data.geocercasJson) : (data.geocercas || []);
@@ -424,12 +431,15 @@
   function pushToCloud(){
     if(!cloudMode || !cloudUser || applyingRemoteUpdate) return;
     if(!pendingGeocercas || !pendingGeocercas.length) return;
+    if(!localDirty) return; // nada nuevo que subir: evita pisar cambios ajenos con datos viejos
     cloudDb.collection('workspaces').doc(cloudWorkspaceId).set({
       geocercasJson: JSON.stringify(pendingGeocercas),
       maxAutoId: geocercaAutoId,
       lastEditedBy: cloudUser.email,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).catch(function(err){
+    }, { merge: true }).then(function(){
+      localDirty = false;
+    }).catch(function(err){
       setStatus('No se pudo guardar en la nube: ' + err.message);
     });
   }
@@ -643,6 +653,7 @@
         setStatus(all.length + ' geocerca(s) detectada(s)' + (nDisabled ? ' (' + nDisabled + ' marcadas como desactivadas, excluidas por default)' : '') + ': ' + all.map(function(g){return g.name + (g.enabled===false?' [desactivada]':'');}).join(', '));
         document.getElementById('editPanel').style.display = 'block';
         renderGeocercaList();
+        localDirty = true;
         saveSession();
       })
       .catch(function(err){
@@ -670,6 +681,7 @@
     document.getElementById('editPanel').style.display = 'block';
     renderGeocercaList();
     setStatus('Ejemplo cargado: geocerca sobre el centro de Querétaro. Pulsa "Calcular cruce".');
+    localDirty = true;
     saveSession();
   });
 
@@ -1276,6 +1288,7 @@
     g.edited = true;
     closeEditModal();
     renderGeocercaList();
+    localDirty = true;
     saveSession();
     document.getElementById('editStatus').textContent = 'Cambios guardados en "' + g.name + '" y autoguardados en este navegador. Vuelve a pulsar "Calcular cruce" para actualizar los resultados con la nueva forma.';
   });
