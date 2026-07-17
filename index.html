@@ -356,6 +356,11 @@
   // si no, un navegador inactivo podía pisar con datos viejos la edición reciente de
   // otra persona cada vez que le tocaba su autoguardado de los 20s.
   var localDirty = false;
+  // true mientras hay un guardado a la nube en curso (desde que se llama a .set()
+  // hasta que se confirma o falla). Mientras esté en true, NO se puede abrir otro
+  // editor: así evitamos por completo la posibilidad de dos guardados encimados,
+  // que era la causa de que ediciones rápidas seguidas a veces se perdieran.
+  var cloudSyncInFlight = false;
   var FIREBASE_SDK_VERSION = '12.16.0';
 
   function loadScriptTag(src){
@@ -442,6 +447,10 @@
     if(!cloudMode || !cloudUser || applyingRemoteUpdate) return;
     if(!pendingGeocercas || !pendingGeocercas.length) return;
     if(!localDirty) return; // nada nuevo que subir: evita pisar cambios ajenos con datos viejos
+    if(cloudSyncInFlight) return; // ya hay un guardado en curso; cuando termine, se reintenta si sigue "dirty"
+    cloudSyncInFlight = true;
+    setStatus('Guardando en la nube...');
+    renderGeocercaList();
     cloudDb.collection('workspaces').doc(cloudWorkspaceId).set({
       geocercasJson: JSON.stringify(pendingGeocercas),
       maxAutoId: geocercaAutoId,
@@ -449,7 +458,12 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true }).then(function(){
       localDirty = false;
+      cloudSyncInFlight = false;
+      renderGeocercaList();
+      setStatus('Guardado en la nube.');
     }).catch(function(err){
+      cloudSyncInFlight = false;
+      renderGeocercaList();
       setStatus('No se pudo guardar en la nube: ' + err.message);
     });
   }
@@ -1136,12 +1150,14 @@
       if(g.enabled === false) tags += '<span class="gtag off">desactivada</span>';
       if(g.edited) tags += '<span class="gtag edited">editada</span>';
       var checked = isSelectedForExport(g._id) ? ' checked' : '';
+      var editBtnDisabled = (cloudMode && cloudSyncInFlight) ? ' disabled' : '';
+      var editBtnLabel = (cloudMode && cloudSyncInFlight) ? 'Guardando...' : 'Editar';
       return '<div class="geocerca-row">' +
         '<input type="checkbox" class="gcheck" data-check-id="' + g._id + '" title="Incluir en la descarga de KML"' + checked + '>' +
         '<span class="swatch2" style="background:' + escapeHtml(color) + '"></span>' +
         '<span class="gname">' + escapeHtml(g.name) + '</span>' +
         tags +
-        '<button class="secondary" data-edit-id="' + g._id + '">Editar</button>' +
+        '<button class="secondary" data-edit-id="' + g._id + '"' + editBtnDisabled + '>' + editBtnLabel + '</button>' +
         '</div>';
     }).join('');
     list.querySelectorAll('[data-edit-id]').forEach(function(btn){
@@ -1204,6 +1220,10 @@
   }
 
   function openEditModal(id){
+    if(cloudMode && cloudSyncInFlight){
+      setStatus('Espera un momento: todavía se está guardando tu edición anterior en la nube...');
+      return;
+    }
     var g = pendingGeocercas.find(function(x){ return x._id === id; });
     if(!g) return;
     editingGeocercaId = id;
